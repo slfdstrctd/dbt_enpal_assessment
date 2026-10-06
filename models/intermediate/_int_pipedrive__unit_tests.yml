@@ -1,0 +1,31 @@
+version: 2
+
+unit_tests:
+  - name: first_stage_entry_is_stable_after_reentry
+    description: A later re-entry does not move the funnel-entry timestamp.
+    model: int_pipedrive__first_stage_entries
+    given:
+      - input: ref('int_pipedrive__deal_changes')
+        rows:
+          - {deal_instance_key: '100|09:00:00', deal_id: 100, changed_at: '2024-01-10 09:00:00', field_key: 'stage_id', new_value_id: 2}
+          - {deal_instance_key: '100|09:00:00', deal_id: 100, changed_at: '2024-02-10 09:00:00', field_key: 'stage_id', new_value_id: 3}
+          - {deal_instance_key: '100|09:00:00', deal_id: 100, changed_at: '2024-03-10 09:00:00', field_key: 'stage_id', new_value_id: 2}
+    expect:
+      rows:
+        - {deal_instance_key: '100|09:00:00', deal_id: 100, stage_id: 2, entered_at: '2024-01-10 09:00:00'}
+        - {deal_instance_key: '100|09:00:00', deal_id: 100, stage_id: 3, entered_at: '2024-02-10 09:00:00'}
+
+  - name: only_first_completed_sales_call_enters_the_funnel
+    description: Scheduled calls are excluded and later completed calls do not re-enter the step.
+    model: int_pipedrive__first_completed_sales_calls
+    given:
+      - input: ref('stg_pipedrive__activities')
+        rows:
+          - {deal_id: 200, activity_type_key: 'meeting', is_done: false, due_at: '2024-01-05 10:00:00'}
+          - {deal_id: 200, activity_type_key: 'meeting', is_done: true, due_at: '2024-01-10 10:00:00'}
+          - {deal_id: 200, activity_type_key: 'meeting', is_done: true, due_at: '2024-02-10 10:00:00'}
+          - {deal_id: 200, activity_type_key: 'follow_up', is_done: true, due_at: '2024-01-12 10:00:00'}
+    expect:
+      rows:
+        - {deal_id: 200, activity_type_key: 'meeting', entered_at: '2024-01-10 10:00:00'}
+
