@@ -1,0 +1,33 @@
+version: 2
+
+models:
+  - name: rep_sales_funnel_monthly
+    description: >
+      Dense monthly funnel inflow. One row is emitted for every month and every
+      required step; zero means no logical entity first entered that step in the
+      month. Steps 1-9 use deal instances, while 2.1 and 3.1 use the independent
+      activity-deal population described in the README.
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: month
+        description: First day of the calendar month.
+        data_type: date
+        data_tests: [not_null]
+      - name: kpi_name
+        description: Business-facing funnel-step name.
+        data_type: text
+        data_tests: [not_null]
+      - name: funnel_step
+        description: Ordered step identifier, including 2.1 and 3.1.
+        data_type: text
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['1', '2', '2.1', '3', '3.1', '4', '5', '6', '7', '8', '9']
+      - name: deals_count
+        description: Logical entities whose first entry into the step occurred in the month.
+        data_type: bigint
+        data_tests: [not_null]

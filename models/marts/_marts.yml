@@ -1,0 +1,199 @@
+version: 2
+
+models:
+  - name: dim_stages
+    description: Pipeline stages with labels resolved from Pipedrive field metadata.
+    columns:
+      - name: stage_id
+        data_tests: [not_null, unique]
+      - name: stage_name
+        data_tests: [not_null, unique]
+
+  - name: dim_lost_reasons
+    description: Pipedrive lost-reason lookup.
+    columns:
+      - name: lost_reason_id
+        data_tests: [not_null, unique]
+      - name: lost_reason_name
+        data_tests: [not_null, unique]
+
+  - name: dim_activity_types
+    description: Activity-type lookup, including whether a type is currently active.
+    columns:
+      - name: activity_type_id
+        data_tests: [not_null, unique]
+      - name: activity_type_key
+        data_tests: [not_null, unique]
+      - name: activity_type_name
+        data_tests: [not_null]
+      - name: is_active
+        data_tests: [not_null]
+
+  - name: dim_users
+    description: Pipedrive users who own deals or are assigned activities.
+    columns:
+      - name: user_id
+        data_tests: [not_null, unique]
+      - name: user_name
+        data_tests: [not_null]
+
+  - name: dim_funnel_steps
+    description: Canonical, ordered definition of the eleven requested funnel steps.
+    columns:
+      - name: source_type
+        data_tests: [not_null]
+      - name: source_key
+        data_tests: [not_null]
+      - name: funnel_step
+        data_tests: [not_null, unique]
+      - name: kpi_name
+        data_tests: [not_null, unique]
+      - name: sort_order
+        data_tests: [not_null, unique]
+
+  - name: fct_deals
+    description: >
+      One row per recovered logical deal instance, reconstructed from the field
+      changelog. Every instance in the supplied extract has a lost reason.
+    columns:
+      - name: deal_instance_key
+        data_tests: [not_null, unique]
+      - name: deal_id
+        description: Source deal id; five values are reused and are therefore not unique.
+        data_tests: [not_null]
+      - name: created_at
+        data_tests: [not_null]
+      - name: owner_user_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_users')
+                field: user_id
+      - name: stage_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_stages')
+                field: stage_id
+      - name: lost_reason_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_lost_reasons')
+                field: lost_reason_id
+      - name: lost_at
+        data_tests: [not_null]
+
+  - name: fct_deal_stage_history
+    description: >
+      One row per observed stage entry. Re-entry and backward movement are
+      preserved. exited_at is the next stage entry or the loss timestamp.
+    columns:
+      - name: stage_history_id
+        data_tests: [not_null, unique]
+      - name: deal_instance_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('fct_deals')
+                field: deal_instance_key
+      - name: deal_id
+        data_tests: [not_null]
+      - name: stage_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_stages')
+                field: stage_id
+      - name: previous_stage_id
+        description: Previous observed stage; null on the first stage event.
+      - name: entered_at
+        data_tests: [not_null]
+      - name: exited_at
+        description: Next stage entry or the loss timestamp on the final stage.
+      - name: is_last_stage
+        data_tests: [not_null]
+      - name: owner_user_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_users')
+                field: user_id
+
+  - name: fct_activities
+    description: >
+      One row per activity. activity_key is unique; activity deal IDs are kept
+      independent because almost none exist in the supplied deal changelog.
+    columns:
+      - name: activity_key
+        data_tests: [not_null, unique]
+      - name: activity_id
+        data_tests: [not_null]
+      - name: deal_id
+        data_tests: [not_null]
+      - name: activity_type_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_activity_types')
+                field: activity_type_id
+      - name: activity_type_key
+        data_tests: [not_null]
+      - name: activity_type_name
+        data_tests: [not_null]
+      - name: assigned_user_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_users')
+                field: user_id
+      - name: is_done
+        data_tests: [not_null]
+      - name: due_at
+        data_tests: [not_null]
+
+  - name: fct_funnel_step_entries
+    description: >
+      Canonical first-entry fact at one logical entity and funnel-step grain.
+      Deal stages and calls remain separate entity populations because the
+      supplied extracts do not share reliable deal identifiers.
+    columns:
+      - name: funnel_step_entry_id
+        data_tests: [not_null, unique]
+      - name: entity_key
+        data_tests: [not_null]
+      - name: entity_type
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [deal_instance, activity_deal]
+      - name: deal_id
+        data_tests: [not_null]
+      - name: funnel_step
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_funnel_steps')
+                field: funnel_step
+      - name: kpi_name
+        data_tests: [not_null]
+      - name: sort_order
+        data_tests: [not_null]
+      - name: entered_at
+        data_tests: [not_null]
+      - name: entry_source
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [creation, stage, activity]

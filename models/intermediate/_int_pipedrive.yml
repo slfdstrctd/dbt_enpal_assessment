@@ -1,0 +1,68 @@
+version: 2
+
+models:
+  - name: int_pipedrive__deal_changes
+    description: >
+      Typed deal changelog with an extract-specific deal_instance_key. Five
+      source deal IDs contain two interleaved generated lifecycles; the clock
+      fingerprint recovers them for this sample and is guarded by tests.
+    columns:
+      - name: deal_instance_key
+        description: >
+          Sample-specific logical lifecycle key. It is not a general Pipedrive
+          business key and must be replaced by a reliable source key in production.
+        data_tests: [not_null]
+      - name: deal_id
+        data_tests: [not_null]
+      - name: instance_time_fingerprint
+        data_tests: [not_null]
+      - name: changed_at
+        data_tests: [not_null]
+      - name: field_key
+        data_tests: [not_null]
+      - name: new_value
+        data_tests: [not_null]
+
+  - name: int_pipedrive__field_options
+    description: One row per selectable value of a Pipedrive deal field.
+    columns:
+      - name: field_key
+        data_tests: [not_null]
+      - name: option_id
+        data_tests: [not_null]
+      - name: option_label
+        data_tests: [not_null]
+
+  - name: int_pipedrive__first_stage_entries
+    description: >
+      One row per logical deal instance and pipeline stage, containing the first
+      observed entry. Re-entry remains available in the full stage-history fact.
+    columns:
+      - name: deal_instance_key
+        data_tests: [not_null]
+      - name: deal_id
+        data_tests: [not_null]
+      - name: stage_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_pipedrive__stages')
+                field: stage_id
+      - name: entered_at
+        data_tests: [not_null]
+  - name: int_pipedrive__first_completed_sales_calls
+    description: >
+      One row per activity deal and funnel-relevant call type, containing the
+      earliest completed call. due_at is the explicit completion-time proxy.
+    columns:
+      - name: deal_id
+        data_tests: [not_null]
+      - name: activity_type_key
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [meeting, sc_2]
+      - name: entered_at
+        data_tests: [not_null]
