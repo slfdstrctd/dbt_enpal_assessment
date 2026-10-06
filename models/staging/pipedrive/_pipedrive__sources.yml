@@ -1,0 +1,67 @@
+version: 2
+
+sources:
+  - name: pipedrive
+    description: >
+      Pipedrive CRM extract loaded into the local Postgres public schema.
+      There is no deal snapshot table. A deal's life is reconstructed from
+      deal_changes, which is the field-update log.
+    database: postgres
+    schema: public
+    tables:
+      - name: deal_changes
+        description: >
+          One row per change of a deal field. Observed fields are add_time
+          (deal created), user_id (owner), stage_id (pipeline stage) and
+          lost_reason (set when the deal is marked lost).
+        columns:
+          - name: deal_id
+          - name: change_time
+          - name: changed_field_key
+          - name: new_value
+
+      - name: fields
+        description: >
+          Deal field dictionary. stage_id and lost_reason carry the option
+          labels shown in Pipedrive. add_time and user_id do not.
+        columns:
+          - name: id
+          - name: field_key
+          - name: name
+          - name: field_value_options
+
+      - name: stages
+        description: Pipeline stages. stage_id is the funnel order.
+        columns:
+          - name: stage_id
+          - name: stage_name
+
+      - name: activity
+        description: >
+          Activities scheduled on a deal. type matches activity_types.type,
+          done marks completion, and due_to is the only timestamp on the row.
+        columns:
+          - name: activity_id
+          - name: type
+          - name: assigned_to_user
+          - name: deal_id
+          - name: done
+          - name: due_to
+
+      - name: activity_types
+        description: >
+          Activity type catalog. Sales Call 1 (meeting) and Sales Call 2
+          (sc_2) are active. Follow Up Call is inactive.
+        columns:
+          - name: id
+          - name: name
+          - name: active
+          - name: type
+
+      - name: users
+        description: Pipedrive users. Referenced by deal owners and activity assignees.
+        columns:
+          - name: id
+          - name: name
+          - name: email
+          - name: modified
